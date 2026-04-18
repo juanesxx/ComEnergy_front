@@ -112,6 +112,16 @@ export default function Servicios() {
       setRequestError("Selecciona una empresa para continuar.");
       return;
     }
+    const selectedOffer = (modal.companies || []).find(
+      (c) => String(c.id) === String(selectedCompanyId)
+    );
+    console.log(modal.companies);
+    console.log(selectedOffer);
+
+    if (!selectedOffer?.id) {
+      setRequestError("No se encontró la oferta de esa empresa para este servicio.");
+      return;
+    }
 
     const trimmedMessage = requestMessage.trim();
 
@@ -125,14 +135,13 @@ export default function Servicios() {
       setRequestError("");
       setRequestFeedback("");
 
-      await apiRequest("/service-requests", {
+      await apiRequest("/service-request", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          serviceId: modal.id,
-          companyId: Number(selectedCompanyId),
+          companyServiceId: selectedOffer.id,
           message: trimmedMessage,
         }),
       });
@@ -287,12 +296,12 @@ export default function Servicios() {
                   >
                     <option value="">Selecciona una empresa</option>
                     {(modal.companies || []).map((company) => (
-                      <option key={company.companyId} value={company.companyId}>
+                      <option key={company.id ?? company.id} value={company.id}>
                         {company.companyName}
                       </option>
                     ))}
                   </select>
-
+                      
                   <textarea
                     value={requestMessage}
                     onChange={(event) => setRequestMessage(event.target.value)}
@@ -300,7 +309,6 @@ export default function Servicios() {
                     className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#07a68a] min-h-24"
                     maxLength={500}
                   />
-
                   <button
                     onClick={createServiceRequest}
                     disabled={requestLoading}

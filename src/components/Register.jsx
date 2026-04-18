@@ -16,6 +16,7 @@ export default function Register() {
     newCompanyName: "",
     companyRole: "owner",
   });
+  const [fieldErrors, setFieldErrors] = useState({});
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
   const [companies, setCompanies] = useState([]);
@@ -92,7 +93,19 @@ export default function Register() {
 
       navigate("/profile");
     } catch (error) {
-      setErr(error.message || "Error al registrarse");
+      if (error.details.length) {
+        const mapped = {};
+
+        error.details.forEach((e) => {
+          mapped[e.path] = e.message;
+        });
+
+        setFieldErrors(mapped);
+        setErr("");
+      } else {
+        setFieldErrors({});
+        setErr(error.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -145,6 +158,11 @@ export default function Register() {
             required
             className="w-full border border-[#07a68a]/40 bg-transparent text-white placeholder-gray-400 rounded px-3 py-2 focus:ring-2 focus:ring-[#07a68a] outline-none"
           />
+          {fieldErrors.name && (
+            <div className="text-red-400 text-xs mt-1">
+              {fieldErrors.name}
+            </div>
+          )}
           <input
             type="email"
             placeholder="Correo electrónico"
@@ -153,7 +171,11 @@ export default function Register() {
             required
             className="w-full border border-[#07a68a]/40 bg-transparent text-white placeholder-gray-400 rounded px-3 py-2 focus:ring-2 focus:ring-[#07a68a] outline-none"
           />
-
+          {fieldErrors.email && (
+            <div className="text-red-400 text-xs mt-1">
+              {fieldErrors.email}
+            </div>
+          )}
           {form.accountType === "company" && (
             <>
               <div>
@@ -241,6 +263,11 @@ export default function Register() {
             required
             className="w-full border border-[#07a68a]/40 bg-transparent text-white placeholder-gray-400 rounded px-3 py-2 focus:ring-2 focus:ring-[#07a68a] outline-none"
           />
+          {fieldErrors.password && (
+            <div className="text-red-400 text-xs mt-1">
+              {fieldErrors.password}
+            </div>
+          )}
           {err && <div className="text-red-400 text-sm">{err}</div>}
           <button
             disabled={loading}
@@ -250,20 +277,6 @@ export default function Register() {
           </button>
         </form>
 
-        <div className="mt-6 flex flex-col gap-3">
-          <button
-            onClick={() => handleOAuth("Google")}
-            className="w-full py-2 border border-[#07a68a]/40 flex items-center justify-center gap-2 rounded text-white hover:bg-[#07a68a]/20 transition-all"
-          >
-            <FcGoogle className="text-xl" /> Registrarse con Google
-          </button>
-          <button
-            onClick={() => handleOAuth("Microsoft")}
-            className="w-full py-2 border border-[#07a68a]/40 flex items-center justify-center gap-2 rounded text-white hover:bg-[#07a68a]/20 transition-all"
-          >
-            <FaMicrosoft className="text-blue-400 text-xl" /> Registrarse con Microsoft
-          </button>
-        </div>
       </div>
     </main>
   );

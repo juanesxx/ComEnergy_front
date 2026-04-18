@@ -5,8 +5,11 @@ import { getAccessToken } from "../utils/auth";
 export default function SellerOfferServicePanel() {
   const token = getAccessToken();
   const [catalog, setCatalog] = useState([]);
+  const [companies, setCompanies] = useState([]);
   const [serviceId, setServiceId] = useState("");
+  const [companyId, setCompanyId] = useState("");
   const [loadingCatalog, setLoadingCatalog] = useState(true);
+  const [loadingCompanies, setLoadingCompanies] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [feedback, setFeedback] = useState("");
@@ -28,6 +31,32 @@ export default function SellerOfferServicePanel() {
     loadCatalog();
   }, [loadCatalog]);
 
+  const loadCompanies = useCallback(async () => {
+    if (!token) {
+      setLoadingCompanies(false);
+      return;
+    }
+    try {
+      setLoadingCompanies(true);
+      const response = await apiRequest("/accounts/users/companies", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const list = response?.data || [];
+      setCompanies(list);
+      if (list.length === 1) {
+        setCompanyId(String(list[0].id));
+      }
+    } catch {
+      setCompanies([]);
+    } finally {
+      setLoadingCompanies(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    loadCompanies();
+  }, [loadCompanies]);
+
   const handleOffer = async (e) => {
     e.preventDefault();
     if (!token) {
@@ -41,6 +70,12 @@ export default function SellerOfferServicePanel() {
       return;
     }
 
+    const cid = Number(companyId);
+    if (!cid) {
+      setError("Selecciona la empresa a la que asociar el servicio.");
+      return;
+    }
+
     try {
       setSubmitting(true);
       setError("");
@@ -49,7 +84,7 @@ export default function SellerOfferServicePanel() {
       await apiRequest("/company-services", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ serviceId: id }),
+        body: JSON.stringify({ serviceId: id, companyId: cid }),
       });
 
       setFeedback("Tu empresa ahora ofrece este servicio. Aparecerá en el listado público.");
@@ -69,6 +104,29 @@ export default function SellerOfferServicePanel() {
       </p>
 
       <form onSubmit={handleOffer} className="max-w-xl space-y-4">
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Empresa</label>
+          <select
+            value={companyId}
+            onChange={(e) => setCompanyId(e.target.value)}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#07a68a]"
+            disabled={loadingCompanies || companies.length === 0}
+          >
+            <option value="">
+              {loadingCompanies
+                ? "Cargando empresas..."
+                : companies.length === 0
+                  ? "No hay empresas disponibles"
+                  : "Selecciona tu empresa"}
+            </option>
+            {companies.map((c) => (
+              <option key={c.id} value={String(c.id)}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">Servicio del catálogo</label>
           <select
@@ -90,7 +148,13 @@ export default function SellerOfferServicePanel() {
 
         <button
           type="submit"
-          disabled={submitting || loadingCatalog || !catalog.length}
+          disabled={
+            submitting ||
+            loadingCatalog ||
+            loadingCompanies ||
+            !catalog.length ||
+            !companyId
+          }
           className="px-4 py-2 rounded-lg bg-[#07a68a] text-white text-sm font-medium hover:brightness-110 disabled:opacity-60"
         >
           {submitting ? "Registrando..." : "Ofrecer este servicio"}

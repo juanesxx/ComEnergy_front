@@ -7,22 +7,31 @@ function buildUrl(path) {
 
 async function parseError(response) {
   let message = `Error HTTP ${response.status}`;
+  let details = [];
+  let type = "HttpError";
+
+  let data = null;
 
   try {
-    const data = await response.json();
-
-    if (data?.error?.message) {
-      message = data.error.message;
-    } else if (Array.isArray(data?.error?.details) && data.error.details.length > 0) {
-      message = data.error.details.map((d) => d.message).join(". ");
-    } else if (data?.message) {
-      message = data.message;
-    }
+    data = await response.json();
   } catch {
-    // Keep default message when body is not JSON.
+    
   }
 
-  throw new Error(message);
+  if (data?.error) {
+    message = data.error.message || message;
+    details = Array.isArray(data.error.details) ? data.error.details : [];
+    type = data.error.type || type;
+  } else if (data?.message) {
+    message = data.message;
+  }
+
+  const err = new Error(message);
+  err.details = details; 
+  err.type = type;
+  err.status = response.status;
+
+  throw err;
 }
 
 export async function apiRequest(path, options = {}) {
