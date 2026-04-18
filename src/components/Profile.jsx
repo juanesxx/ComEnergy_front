@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { getCurrent, logoutUser } from "../utils/auth";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import ServiceRequestsCenter from "./ServiceRequestsCenter";
+import AdminServicesPanel from "./AdminServicesPanel";
+import SellerOfferServicePanel from "./SellerOfferServicePanel";
 
 /* ---------- DASHBOARD PROFESIONAL ---------- */
 export default function Profile() {
@@ -151,6 +153,9 @@ export default function Profile() {
             ))}
           </div>
         </div>
+
+        {(user.roles || []).includes("ADMIN") && <AdminServicesPanel />}
+        {(user.roles || []).includes("SELLER") && <SellerOfferServicePanel />}
 
         <ServiceRequestsCenter />
       </div>

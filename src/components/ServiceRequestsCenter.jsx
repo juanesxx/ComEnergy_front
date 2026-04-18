@@ -54,9 +54,8 @@ function getStatusClass(status) {
 }
 
 function getRequestViewOptions(roles) {
-  const options = [{ key: "customer", label: "Mis solicitudes", endpoint: "/service-requests/mine" }];
-
-  if (roles.includes("seller")) {
+  const options = [{ key: "customer", label: "Mis solicitudes", endpoint: "/service-request/mine" }];
+  if (roles.includes("SELLER")) {
     options.push({
       key: "seller",
       label: "Solicitudes de empresa",
@@ -64,7 +63,7 @@ function getRequestViewOptions(roles) {
     });
   }
 
-  if (roles.includes("admin")) {
+  if (roles.includes("ADMIN")) {
     options.push({
       key: "admin",
       label: "Panel admin",
@@ -79,7 +78,7 @@ export default function ServiceRequestsCenter() {
   const user = getCurrent();
   const token = getAccessToken();
   const roles = user?.roles || [];
-  const viewOptions = useMemo(() => getRequestViewOptions(roles), [roles.join(",")]);
+  const viewOptions = getRequestViewOptions(roles);
 
   const [activeView, setActiveView] = useState(viewOptions[0]?.key || "customer");
   const [requests, setRequests] = useState([]);
@@ -120,6 +119,7 @@ export default function ServiceRequestsCenter() {
       try {
         setStatus("loading");
         setError("");
+
         const response = await apiRequest(activeViewEndpoint, {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -374,7 +374,7 @@ export default function ServiceRequestsCenter() {
   const getAvailableStatusChanges = (requestItem) => {
     const transitions = ALLOWED_TRANSITIONS[requestItem.status] || [];
 
-    if (roles.includes("admin")) {
+    if (roles.includes("ADMIN")) {
       return transitions;
     }
 

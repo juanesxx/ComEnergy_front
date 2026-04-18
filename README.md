@@ -25,3 +25,5 @@ VITE_API_URL=http://localhost:3000
 3. Refresh de sesión: `POST /accounts/refresh` (cookie `refresh_token`)
 4. Logout: `POST /accounts/logout`
 5. Catálogo de servicios: `GET /services` y `GET /company-services?serviceId=<id>`
+6. Crear servicio global (rol ADMIN): `POST /services` con cuerpo JSON `{ title, summary, detail, imageUrl? }` y cabecera `Authorization: Bearer <token>`
+7. Ofrecer un servicio como empresa (rol SELLER): `POST /company-services` con `{ serviceId }` y el mismo esquema de autorización
