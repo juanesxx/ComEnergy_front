@@ -1,7 +1,7 @@
 import React from "react";
 import { motion } from "framer-motion";
 
-export default function Hero() {
+export default function Hero({ onOpenQuote }) {
   return (
     <section id="inicio" className="pt-24 bg-gradient-to-br from-white via-[#f2fffb] to-[#e6fffa]">
       <div className="max-w-7xl mx-auto px-6 py-20 grid md:grid-cols-2 gap-10 items-center">
@@ -14,9 +14,22 @@ export default function Hero() {
             ComEnergia es una plataforma para el intercambio de servicios, excedentes y conocimiento entre comunidades energéticas. 
             Facilita la cooperación técnica, la capacitación y la puesta en marcha de proyectos renovables a escala local.
           </p>
-          <div className="flex gap-4">
-            <a href="#servicios" className="px-5 py-3 bg-[#07a68a] text-white rounded-lg">Explorar servicios</a>
-            <a href="#que-es" className="px-5 py-3 border border-[#07a68a] text-[#07a68a] rounded-lg">Saber más</a>
+          <div className="flex flex-wrap gap-3 sm:gap-4">
+            <a href="#servicios" className="px-5 py-3 bg-[#07a68a] text-white rounded-lg">
+              Explorar servicios
+            </a>
+            {typeof onOpenQuote === "function" && (
+              <button
+                type="button"
+                onClick={onOpenQuote}
+                className="px-5 py-3 border border-[#07a68a] text-[#07a68a] rounded-lg bg-white/80 hover:bg-white"
+              >
+                Cotiza ahora
+              </button>
+            )}
+            <a href="#que-es" className="px-5 py-3 border border-gray-300 text-gray-800 rounded-lg hover:border-[#07a68a] hover:text-[#07a68a]">
+              Saber más
+            </a>
           </div>
         </div>
         <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} className="rounded-xl overflow-hidden shadow-lg">

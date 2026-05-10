@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { getCurrent, logoutUser } from "../utils/auth";
 
-export default function Header() {
+export default function Header({ onOpenQuote }) {
   const [user, setUser] = useState(getCurrent());
 
   useEffect(() => {
@@ -42,7 +42,26 @@ export default function Header() {
           <a href="#normativa" className="hover:text-[#07a68a]">Normativa</a>
         </nav>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
+          {typeof onOpenQuote === "function" && (
+            <button
+              type="button"
+              onClick={onOpenQuote}
+              className="hidden sm:inline-flex px-3 py-2 text-sm font-medium rounded-lg border border-[#07a68a] text-[#07a68a] hover:bg-[#07a68a]/10"
+            >
+              Cotiza ahora
+            </button>
+          )}
+          {typeof onOpenQuote === "function" && (
+            <button
+              type="button"
+              onClick={onOpenQuote}
+              className="sm:hidden px-2 py-1.5 text-xs font-semibold rounded-lg bg-[#07a68a] text-white"
+              aria-label="Cotiza ahora"
+            >
+              Cotiza
+            </button>
+          )}
           {user ? (
             <>
               <Link to="/profile" className="text-sm text-[#07a68a]">{user.name}</Link>

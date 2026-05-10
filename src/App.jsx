@@ -1,9 +1,10 @@
-import React from "react";
+import React, { useState } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { useAutoRefreshToken } from "./utils/useAutoRefreshToken";
 
 import Header from "./components/Header";
 import Hero from "./components/Hero";
+import CotizaAhoraModal from "./components/CotizaAhoraModal";
 import QueEs from "./components/QueEs";
 import Beneficios from "./components/Beneficios";
 import Servicios from "./components/Servicios";
@@ -17,9 +18,11 @@ import Footer from "./components/Footer";
 
 export default function App() {
   useAutoRefreshToken();
+  const [cotizaOpen, setCotizaOpen] = useState(false);
+
   return (
     <Router>
-      <Header />
+      <Header onOpenQuote={() => setCotizaOpen(true)} />
 
       <Routes>
         {/* Página principal */}
@@ -27,7 +30,7 @@ export default function App() {
           path="/"
           element={
             <>
-              <Hero />
+              <Hero onOpenQuote={() => setCotizaOpen(true)} />
               <QueEs />
               <Beneficios />
               <Servicios />
@@ -45,6 +48,8 @@ export default function App() {
       </Routes>
 
       <Footer />
+
+      <CotizaAhoraModal open={cotizaOpen} onClose={() => setCotizaOpen(false)} />
     </Router>
   );
 }
