@@ -70,7 +70,7 @@ export default function Login() {
         </form>
 
         <div className="mt-6 flex flex-col gap-3">
-          <button
+          {/* <button
             onClick={() => handleOAuth("Google")}
             className="w-full py-2 border border-[#07a68a]/40 flex items-center justify-center gap-2 rounded text-white hover:bg-[#07a68a]/20 transition-all"
           >
@@ -81,7 +81,7 @@ export default function Login() {
             className="w-full py-2 border border-[#07a68a]/40 flex items-center justify-center gap-2 rounded text-white hover:bg-[#07a68a]/20 transition-all"
           >
             <FaMicrosoft className="text-blue-400 text-xl" /> Iniciar con Microsoft
-          </button>
+          </button> */}
         </div>
       </div>
     </main>
