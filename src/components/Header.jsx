@@ -1,24 +1,13 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { Link } from "react-router-dom";
-import { getCurrent, logoutUser } from "../utils/auth";
+import { useAuth } from "../context/AuthContext";
+import CompanySelector from "./CompanySelector";
 
 export default function Header({ onOpenQuote }) {
-  const [user, setUser] = useState(getCurrent());
-
-  useEffect(() => {
-    const updateUser = () => setUser(getCurrent());
-    window.addEventListener("storage", updateUser);
-    window.addEventListener("auth:changed", updateUser);
-
-    return () => {
-      window.removeEventListener("storage", updateUser);
-      window.removeEventListener("auth:changed", updateUser);
-    };
-  }, []);
+  const { user, logout, isAuthenticated } = useAuth();
 
   async function handleLogout() {
-    await logoutUser();
-    setUser(null);
+    await logout();
     window.location.href = "/";
   }
 
@@ -62,6 +51,7 @@ export default function Header({ onOpenQuote }) {
               Cotiza
             </button>
           )}
+          {isAuthenticated && <CompanySelector />}
           {user ? (
             <>
               <Link to="/profile" className="text-sm text-[#07a68a]">{user.name}</Link>

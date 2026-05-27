@@ -1,11 +1,13 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { loginUser } from "../utils/auth";
-import { FcGoogle } from "react-icons/fc";
-import { FaMicrosoft } from "react-icons/fa";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { useCompany } from "../context/CompanyContext";
 
 export default function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { login } = useAuth();
+  const { loadCompanies } = useCompany();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [err, setErr] = useState("");
@@ -17,8 +19,10 @@ export default function Login() {
     setLoading(true);
 
     try {
-      await loginUser({ email, password });
-      navigate("/profile");
+      await login({ email, password });
+      await loadCompanies();
+      const returnUrl = searchParams.get("returnUrl");
+      navigate(returnUrl ? decodeURIComponent(returnUrl) : "/profile", { replace: true });
     } catch (error) {
       setErr(error.message || "Error al iniciar sesión");
     } finally {
@@ -26,14 +30,8 @@ export default function Login() {
     }
   };
 
-  const handleOAuth = (provider) => {
-    alert(`Inicio de sesión simulado con ${provider}`);
-    navigate("/profile");
-  };
-
   return (
    <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-black to-[#013220] relative overflow-hidden py-20">
-      {/* Efecto luces */}
       <div className="absolute inset-0">
         <div className="absolute w-96 h-96 bg-[#07a68a]/20 blur-3xl rounded-full top-1/3 left-1/3 animate-pulse"></div>
         <div className="absolute w-72 h-72 bg-[#09ffb4]/10 blur-2xl rounded-full bottom-10 right-20 animate-pulse"></div>
@@ -64,25 +62,11 @@ export default function Login() {
           <button
             disabled={loading}
             className="w-full py-2 bg-[#07a68a] hover:brightness-110 text-white rounded shadow-md transition-all disabled:opacity-70"
+            type="submit"
           >
             {loading ? "Ingresando..." : "Ingresar"}
           </button>
         </form>
-
-        <div className="mt-6 flex flex-col gap-3">
-          {/* <button
-            onClick={() => handleOAuth("Google")}
-            className="w-full py-2 border border-[#07a68a]/40 flex items-center justify-center gap-2 rounded text-white hover:bg-[#07a68a]/20 transition-all"
-          >
-            <FcGoogle className="text-xl" /> Iniciar con Google
-          </button>
-          <button
-            onClick={() => handleOAuth("Microsoft")}
-            className="w-full py-2 border border-[#07a68a]/40 flex items-center justify-center gap-2 rounded text-white hover:bg-[#07a68a]/20 transition-all"
-          >
-            <FaMicrosoft className="text-blue-400 text-xl" /> Iniciar con Microsoft
-          </button> */}
-        </div>
       </div>
     </main>
   );

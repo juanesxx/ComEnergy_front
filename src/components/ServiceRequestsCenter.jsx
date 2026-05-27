@@ -1,11 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { apiBaseUrl, apiRequest } from "../utils/api";
-import { getAccessToken, getCurrent, logoutUser } from "../utils/auth";
+import { logoutUser } from "../utils/auth";
+import { useAuth } from "../context/AuthContext";
+import { useCompany } from "../context/CompanyContext";
+import RequestRatingSection from "./RequestRatingSection";
 
 const STATUS_LABELS = {
   pending: "Pendiente",
   en_progreso: "En progreso",
   finalizada: "Finalizada",
+  finished: "Finalizada",
   cancelada: "Cancelada",
   rechazada: "Rechazada",
 };
@@ -46,24 +50,27 @@ function formatDate(value) {
 }
 
 function getStatusClass(status) {
-  if (status === "finalizada") return "bg-emerald-100 text-emerald-700";
+  if (status === "finalizada" || status === "finished") return "bg-emerald-100 text-emerald-700";
   if (status === "en_progreso") return "bg-blue-100 text-blue-700";
   if (status === "rechazada") return "bg-red-100 text-red-700";
   if (status === "cancelada") return "bg-gray-200 text-gray-700";
   return "bg-amber-100 text-amber-700";
 }
 
-function getRequestViewOptions(roles) {
-  const options = [{ key: "customer", label: "Mis solicitudes", endpoint: "/service-request/mine" }];
-  if (roles.includes("SELLER")) {
+function getRequestViewOptions({ hasActiveCompany, isPlatformAdmin }) {
+  const options = [
+    { key: "customer", label: "Mis solicitudes", endpoint: "/service-requests/mine" },
+  ];
+
+  if (hasActiveCompany) {
     options.push({
-      key: "seller",
+      key: "company",
       label: "Solicitudes de empresa",
       endpoint: "/service-requests/company",
     });
   }
 
-  if (roles.includes("ADMIN")) {
+  if (isPlatformAdmin) {
     options.push({
       key: "admin",
       label: "Panel admin",
@@ -75,12 +82,21 @@ function getRequestViewOptions(roles) {
 }
 
 export default function ServiceRequestsCenter() {
-  const user = getCurrent();
-  const token = getAccessToken();
-  const roles = user?.roles || [];
-  const viewOptions = getRequestViewOptions(roles);
+  const { token, isPlatformAdmin } = useAuth();
+  const { companies, isCompanyAdmin, isCompanyMember } = useCompany();
+  const hasActiveCompany = companies.length > 0;
+  const viewOptions = useMemo(
+    () => getRequestViewOptions({ hasActiveCompany, isPlatformAdmin }),
+    [hasActiveCompany, isPlatformAdmin]
+  );
 
-  const [activeView, setActiveView] = useState(viewOptions[0]?.key || "customer");
+  const [activeView, setActiveView] = useState("customer");
+
+  useEffect(() => {
+    if (!viewOptions.some((o) => o.key === activeView)) {
+      setActiveView(viewOptions[0]?.key || "customer");
+    }
+  }, [viewOptions, activeView]);
   const [requests, setRequests] = useState([]);
   const [selectedRequestId, setSelectedRequestId] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -120,11 +136,7 @@ export default function ServiceRequestsCenter() {
         setStatus("loading");
         setError("");
 
-        const response = await apiRequest(activeViewEndpoint, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const response = await apiRequest(activeViewEndpoint);
 
         if (!isMounted) {
           return;
@@ -157,7 +169,6 @@ export default function ServiceRequestsCenter() {
     };
   }, [activeViewEndpoint, token]);
 
-  // Conexión WebSocket - una sola vez al montar
   useEffect(() => {
     if (!token) {
       return;
@@ -203,11 +214,7 @@ export default function ServiceRequestsCenter() {
         ) {
           if (!activeViewEndpoint) return;
 
-          apiRequest(activeViewEndpoint, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          })
+          apiRequest(activeViewEndpoint)
             .then((response) => {
               if (componentStillMounted) {
                 setRequests(response?.data || []);
@@ -286,11 +293,7 @@ export default function ServiceRequestsCenter() {
 
     async function loadMessages() {
       try {
-        const response = await apiRequest(`/service-requests/${requestId}/messages`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const response = await apiRequest(`/service-requests/${requestId}/messages`);
 
         if (isMounted) {
           setMessages(response?.data || []);
@@ -348,9 +351,6 @@ export default function ServiceRequestsCenter() {
     try {
       await apiRequest(`/service-requests/${requestId}/status`, {
         method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({
           status: nextStatus,
         }),
@@ -360,11 +360,7 @@ export default function ServiceRequestsCenter() {
         return;
       }
 
-      const response = await apiRequest(activeViewEndpoint, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await apiRequest(activeViewEndpoint);
       setRequests(response?.data || []);
     } catch (updateError) {
       setError(updateError.message || "No se pudo actualizar el estado.");
@@ -374,14 +370,18 @@ export default function ServiceRequestsCenter() {
   const getAvailableStatusChanges = (requestItem) => {
     const transitions = ALLOWED_TRANSITIONS[requestItem.status] || [];
 
-    if (roles.includes("ADMIN")) {
+    if (isPlatformAdmin) {
       return transitions;
     }
 
-    if (activeView === "seller") {
+    if (activeView === "company" && isCompanyMember) {
       return transitions.filter((value) =>
         ["en_progreso", "finalizada", "rechazada"].includes(value)
       );
+    }
+
+    if (activeView === "company") {
+      return [];
     }
 
     if (activeView === "customer") {
@@ -486,7 +486,7 @@ export default function ServiceRequestsCenter() {
           <div className="border border-gray-200 rounded-lg overflow-hidden flex flex-col min-h-[420px]">
             {selectedRequest ? (
               <>
-                <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 shrink-0">
                   <p className="text-sm font-semibold text-gray-800">
                     Solicitud #{selectedRequest.id}
                   </p>
@@ -495,7 +495,12 @@ export default function ServiceRequestsCenter() {
                   </p>
                 </div>
 
-                <div className="flex-1 p-3 overflow-y-auto bg-white space-y-2">
+                <RequestRatingSection
+                  request={selectedRequest}
+                  allowRate={activeView === "customer"}
+                />
+
+                <div className="flex-1 p-3 overflow-y-auto bg-white space-y-2 min-h-0">
                   {messages.map((message) => (
                     <div
                       key={message.id}

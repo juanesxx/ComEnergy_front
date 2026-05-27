@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { apiRequest } from "../utils/api";
-import { getAccessToken } from "../utils/auth";
+import { useAuth } from "../context/AuthContext";
 
 const emptyForm = {
   title: "",
@@ -10,7 +10,7 @@ const emptyForm = {
 };
 
 export default function AdminServicesPanel() {
-  const token = getAccessToken();
+  const { isAuthenticated } = useAuth();
   const [form, setForm] = useState(emptyForm);
   const [services, setServices] = useState([]);
   const [loadingList, setLoadingList] = useState(true);
@@ -19,20 +19,18 @@ export default function AdminServicesPanel() {
   const [feedback, setFeedback] = useState("");
 
   const loadServices = useCallback(async () => {
-    if (!token) return;
+    if (!isAuthenticated) return;
     try {
       setLoadingList(true);
       setError("");
-      const response = await apiRequest("/services", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await apiRequest("/services");
       setServices(response?.data || []);
     } catch (err) {
       setError(err.message || "No se pudo cargar el catálogo de servicios.");
     } finally {
       setLoadingList(false);
     }
-  }, [token]);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     loadServices();
@@ -40,7 +38,7 @@ export default function AdminServicesPanel() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!token) {
+    if (!isAuthenticated) {
       setError("Sesión no válida.");
       return;
     }
@@ -62,7 +60,6 @@ export default function AdminServicesPanel() {
 
       await apiRequest("/services", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           title,
           summary,

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { apiBaseUrl, apiRequest } from "../utils/api";
-import { getAccessToken } from "../utils/auth";
+import { useAuth } from "../context/AuthContext";
 
 function toWsBaseUrl(httpBaseUrl) {
   if (httpBaseUrl.startsWith("https://")) {
@@ -28,6 +28,7 @@ function formatTime(value) {
 }
 
 export default function ContactChatPanel({ serviceId, companyId, companyName }) {
+  const { token } = useAuth();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [status, setStatus] = useState("idle");
@@ -55,8 +56,6 @@ export default function ContactChatPanel({ serviceId, companyId, companyName }) 
       return undefined;
     }
 
-    const token = getAccessToken();
-
     if (!token) {
       setStatus("unauthenticated");
       return undefined;
@@ -67,12 +66,7 @@ export default function ContactChatPanel({ serviceId, companyId, companyName }) 
     async function loadHistory() {
       try {
         const response = await apiRequest(
-          `/contact-chats/messages?serviceId=${serviceId}&companyId=${companyId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
+          `/contact-chats/messages?serviceId=${serviceId}&companyId=${companyId}`
         );
 
         if (isActive) {

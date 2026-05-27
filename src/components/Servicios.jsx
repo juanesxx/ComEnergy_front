@@ -2,10 +2,14 @@ import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FaStar } from "react-icons/fa";
 import { apiRequest } from "../utils/api";
-import { getAccessToken } from "../utils/auth";
+import { useAuth } from "../context/AuthContext";
+import { getCompanyServicesByServiceId } from "../services/ratingsApi";
 
 export default function Servicios() {
+  const { isAuthenticated } = useAuth();
   const [modal, setModal] = useState(null);
+  const [modalLoading, setModalLoading] = useState(false);
+  const [modalError, setModalError] = useState("");
   const [servicios, setServicios] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -26,44 +30,8 @@ export default function Servicios() {
         const servicesResponse = await apiRequest("/services");
         const serviceList = servicesResponse?.data || [];
 
-        const enriched = await Promise.all(
-          serviceList.map(async (service) => {
-            try {
-              const companiesResponse = await apiRequest(
-                `/company-services?serviceId=${service.id}`
-              );
-              const companies = companiesResponse?.data || [];
-              const primaryCompany = companies[0];
-
-              return {
-                id: service.id,
-                title: service.title,
-                imageUrl: service.imageUrl,
-                summary: service.summary,
-                detail: service.detail,
-                companyId: primaryCompany?.companyId || null,
-                empresa: primaryCompany?.companyName || "Comunidad asociada",
-                rating: primaryCompany?.averageRating ?? null,
-                companies,
-              };
-            } catch {
-              return {
-                id: service.id,
-                title: service.title,
-                imageUrl: service.imageUrl,
-                summary: service.summary,
-                detail: service.detail,
-                companyId: null,
-                empresa: "Comunidad asociada",
-                rating: null,
-                companies: [],
-              };
-            }
-          })
-        );
-
         if (isMounted) {
-          setServicios(enriched);
+          setServicios(serviceList);
         }
       } catch {
         if (isMounted) {
@@ -83,16 +51,37 @@ export default function Servicios() {
     };
   }, []);
 
-  const openServiceModal = (service) => {
+  const openServiceModal = async (service) => {
     setModal(service);
-    setSelectedCompanyId(String(service.companies?.[0]?.companyId || ""));
+    setModalLoading(true);
+    setModalError("");
+    setSelectedCompanyId("");
     setRequestMessage("");
     setRequestFeedback("");
     setRequestError("");
+
+    try {
+      const companies = await getCompanyServicesByServiceId(service.id);
+      const primaryCompany = companies[0];
+
+      setModal({
+        ...service,
+        companies,
+        empresa: primaryCompany?.companyName || "Comunidad asociada",
+        rating: primaryCompany?.averageRating ?? null,
+      });
+      setSelectedCompanyId(String(companies[0]?.id || ""));
+    } catch {
+      setModalError("No se pudo cargar la información de las empresas para este servicio.");
+    } finally {
+      setModalLoading(false);
+    }
   };
 
   const closeServiceModal = () => {
     setModal(null);
+    setModalLoading(false);
+    setModalError("");
     setSelectedCompanyId("");
     setRequestMessage("");
     setRequestFeedback("");
@@ -101,9 +90,7 @@ export default function Servicios() {
   };
 
   const createServiceRequest = async () => {
-    const token = getAccessToken();
-
-    if (!token) {
+    if (!isAuthenticated) {
       setRequestError("Debes iniciar sesión para solicitar este servicio.");
       return;
     }
@@ -112,11 +99,10 @@ export default function Servicios() {
       setRequestError("Selecciona una empresa para continuar.");
       return;
     }
+
     const selectedOffer = (modal.companies || []).find(
       (c) => String(c.id) === String(selectedCompanyId)
     );
-    console.log(modal.companies);
-    console.log(selectedOffer);
 
     if (!selectedOffer?.id) {
       setRequestError("No se encontró la oferta de esa empresa para este servicio.");
@@ -137,9 +123,6 @@ export default function Servicios() {
 
       await apiRequest("/service-request", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({
           companyServiceId: selectedOffer.id,
           message: trimmedMessage,
@@ -177,7 +160,6 @@ export default function Servicios() {
 
         {error && <p className="text-sm text-amber-700 mb-6">{error}</p>}
 
-        {/* Tarjetas de servicios */}
         <div className="grid md:grid-cols-3 gap-8">
           {servicios.map((s) => (
             <motion.div
@@ -197,28 +179,13 @@ export default function Servicios() {
                   </h3>
                   <p className="text-sm text-gray-600">{s.summary}</p>
                 </div>
-                <div className="mt-4 flex justify-between items-center">
+                <div className="mt-4 flex justify-end">
                   <button
                     onClick={() => openServiceModal(s)}
                     className="px-4 py-2 text-sm bg-[#07a68a] text-white rounded-lg hover:brightness-110"
                   >
                     Ver detalles
                   </button>
-                  <div className="flex items-center text-yellow-400">
-                    {Array(5)
-                      .fill(0)
-                      .map((_, i) => (
-                        <FaStar
-                          key={i}
-                          className={`${
-                            i < Math.round(s.rating || 0) ? "" : "opacity-30"
-                          }`}
-                        />
-                      ))}
-                    <span className="ml-2 text-gray-500 text-sm">
-                      {typeof s.rating === "number" ? s.rating.toFixed(1) : "Sin calificar"}
-                    </span>
-                  </div>
                 </div>
               </div>
             </motion.div>
@@ -226,7 +193,6 @@ export default function Servicios() {
         </div>
       </div>
 
-      {/* Modal de detalle */}
       <AnimatePresence>
         {modal && (
           <motion.div
@@ -236,7 +202,7 @@ export default function Servicios() {
             exit={{ opacity: 0 }}
           >
             <motion.div
-              className="bg-white rounded-2xl shadow-2xl p-8 max-w-2xl w-[90%] relative"
+              className="bg-white rounded-2xl shadow-2xl p-8 max-w-2xl w-[90%] relative max-h-[90vh] overflow-y-auto"
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
@@ -257,74 +223,90 @@ export default function Servicios() {
               />
               <p className="text-gray-700 mb-4 text-sm">{modal.detail}</p>
 
-              <div className="flex justify-between items-center border-t pt-4">
-                <div>
-                  <p className="text-sm text-gray-600">
-                    Prestado por:{" "}
-                    <span className="font-semibold text-[#07a68a]">
-                      {modal.empresa}
-                    </span>
-                  </p>
-                  <div className="flex items-center text-yellow-400">
-                    {Array(5)
-                      .fill(0)
-                      .map((_, i) => (
-                        <FaStar
-                          key={i}
-                          className={`${
-                            i < Math.round(modal.rating || 0) ? "" : "opacity-30"
-                          }`}
-                        />
-                      ))}
-                    <span className="ml-2 text-gray-500 text-sm">
-                      {typeof modal.rating === "number" ? modal.rating.toFixed(1) : "Sin calificar"}
-                    </span>
+              {modalLoading && (
+                <p className="text-sm text-gray-500 mb-4">
+                  Cargando empresas y calificaciones...
+                </p>
+              )}
+
+              {modalError && (
+                <p className="text-sm text-amber-700 mb-4">{modalError}</p>
+              )}
+
+              {!modalLoading && !modalError && (
+                <div className="flex justify-between items-center border-t pt-4">
+                  <div>
+                    <p className="text-sm text-gray-600">
+                      Prestado por:{" "}
+                      <span className="font-semibold text-[#07a68a]">
+                        {modal.empresa}
+                      </span>
+                    </p>
+                    <div className="flex items-center text-yellow-400">
+                      {Array(5)
+                        .fill(0)
+                        .map((_, i) => (
+                          <FaStar
+                            key={i}
+                            className={`${
+                              i < Math.round(modal.rating || 0) ? "" : "opacity-30"
+                            }`}
+                          />
+                        ))}
+                      <span className="ml-2 text-gray-500 text-sm">
+                        {typeof modal.rating === "number"
+                          ? modal.rating.toFixed(1)
+                          : "Sin calificar"}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
-              <div className="mt-6 rounded-xl border border-gray-200 p-4 bg-gray-50">
-                <h4 className="text-sm font-semibold text-gray-800 mb-2">
-                  Solicitar este servicio
-                </h4>
+              {!modalLoading && !modalError && (
+                <div className="mt-6 rounded-xl border border-gray-200 p-4 bg-gray-50">
+                  <h4 className="text-sm font-semibold text-gray-800 mb-2">
+                    Solicitar este servicio
+                  </h4>
 
-                <div className="space-y-3">
-                  <select
-                    value={selectedCompanyId}
-                    onChange={(event) => setSelectedCompanyId(event.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#07a68a]"
-                  >
-                    <option value="">Selecciona una empresa</option>
-                    {(modal.companies || []).map((company) => (
-                      <option key={company.id ?? company.id} value={company.id}>
-                        {company.companyName}
-                      </option>
-                    ))}
-                  </select>
-                      
-                  <textarea
-                    value={requestMessage}
-                    onChange={(event) => setRequestMessage(event.target.value)}
-                    placeholder="Mensaje inicial de la solicitud"
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#07a68a] min-h-24"
-                    maxLength={500}
-                  />
-                  <button
-                    onClick={createServiceRequest}
-                    disabled={requestLoading}
-                    className="px-4 py-2 rounded-lg bg-[#07a68a] text-white text-sm font-medium hover:brightness-110 disabled:opacity-60"
-                  >
-                    {requestLoading ? "Creando solicitud..." : "Crear solicitud"}
-                  </button>
+                  <div className="space-y-3">
+                    <select
+                      value={selectedCompanyId}
+                      onChange={(event) => setSelectedCompanyId(event.target.value)}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#07a68a]"
+                    >
+                      <option value="">Selecciona una empresa</option>
+                      {(modal.companies || []).map((company) => (
+                        <option key={company.id} value={company.id}>
+                          {company.companyName}
+                        </option>
+                      ))}
+                    </select>
 
-                  {requestFeedback && (
-                    <p className="text-xs text-emerald-700">{requestFeedback}</p>
-                  )}
-                  {requestError && (
-                    <p className="text-xs text-amber-700">{requestError}</p>
-                  )}
+                    <textarea
+                      value={requestMessage}
+                      onChange={(event) => setRequestMessage(event.target.value)}
+                      placeholder="Mensaje inicial de la solicitud"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#07a68a] min-h-24"
+                      maxLength={500}
+                    />
+                    <button
+                      onClick={createServiceRequest}
+                      disabled={requestLoading || !(modal.companies || []).length}
+                      className="px-4 py-2 rounded-lg bg-[#07a68a] text-white text-sm font-medium hover:brightness-110 disabled:opacity-60"
+                    >
+                      {requestLoading ? "Creando solicitud..." : "Crear solicitud"}
+                    </button>
+
+                    {requestFeedback && (
+                      <p className="text-xs text-emerald-700">{requestFeedback}</p>
+                    )}
+                    {requestError && (
+                      <p className="text-xs text-amber-700">{requestError}</p>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
             </motion.div>
           </motion.div>
         )}

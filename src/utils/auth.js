@@ -1,4 +1,5 @@
 import { apiRequest } from "./api";
+import { setStoredActiveCompanyId } from "./companyStorage";
 
 const CURRENT_USER_KEY = "currentUser";
 const ACCESS_TOKEN_KEY = "accessToken";
@@ -24,6 +25,7 @@ export async function registerUser({ name, email, password }) {
 
   await apiRequest("/accounts/users", {
     method: "POST",
+    skipAuth: true,
     body: JSON.stringify({
       name,
       email,
@@ -32,46 +34,20 @@ export async function registerUser({ name, email, password }) {
     }),
   });
 
-  // Login after successful registration for a smoother UX.
   return loginUser({ email, password, name });
 }
 
-export async function getCompanies() {
-  const response = await apiRequest("/accounts/companies", {
+export async function fetchUserCompanies() {
+  const response = await apiRequest("/accounts/users/companies", {
     method: "GET",
   });
-
   return response?.data || [];
-}
-
-export async function registerCompanyUser({
-  name,
-  email,
-  password,
-  companyName,
-  companyRole,
-}) {
-  if (!name || !email || !password || !companyName) {
-    throw new Error("Campos incompletos");
-  }
-
-  await apiRequest("/accounts/company-users", {
-    method: "POST",
-    body: JSON.stringify({
-      name,
-      email,
-      password,
-      companyName,
-      companyRole,
-    }),
-  });
-
-  return loginUser({ email, password, name });
 }
 
 export async function loginUser({ email, password, name }) {
   const response = await apiRequest("/accounts/login", {
     method: "POST",
+    skipAuth: true,
     body: JSON.stringify({ email, password }),
   });
 
@@ -90,6 +66,7 @@ export async function loginUser({ email, password, name }) {
 export async function refreshSession() {
   const response = await apiRequest("/accounts/refresh", {
     method: "POST",
+    skipAuth: true,
   });
 
   setAccessToken(response?.accessToken || null);
@@ -100,15 +77,34 @@ export function getAccessToken() {
   return localStorage.getItem(ACCESS_TOKEN_KEY);
 }
 
-// Devuelve la fecha de expiración del token en milisegundos (Unix ms) o null si no es válido
-export function getTokenExpiry(token) {
+export function getTokenPayload() {
+  const token = getAccessToken();
   if (!token) return null;
   try {
     const payloadBase64 = token.split(".")[1];
     const json = atob(payloadBase64.replace(/-/g, "+").replace(/_/g, "/"));
-    const payload = JSON.parse(json);
-    if (!payload.exp) return null;
-    return payload.exp * 1000; // convertir segundos a ms
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
+export function getUserIdFromToken() {
+  const payload = getTokenPayload();
+  if (!payload) return null;
+  const raw = payload.userId ?? payload.id ?? payload.sub;
+  const numeric = Number(raw);
+  return Number.isFinite(numeric) ? numeric : raw;
+}
+
+export function getTokenExpiry(token) {
+  if (!token) return null;
+  try {
+    const payload = token
+      ? JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")))
+      : getTokenPayload();
+    if (!payload?.exp) return null;
+    return payload.exp * 1000;
   } catch {
     return null;
   }
@@ -124,6 +120,52 @@ export async function logoutUser() {
   } finally {
     localStorage.removeItem(CURRENT_USER_KEY);
     localStorage.removeItem(ACCESS_TOKEN_KEY);
+    setStoredActiveCompanyId(null);
     window.dispatchEvent(new Event("auth:changed"));
   }
+}
+
+export async function acceptInvitation(token) {
+  const response = await apiRequest("/accounts/invitations/accept", {
+    method: "POST",
+    body: JSON.stringify({ token }),
+  });
+  return response;
+}
+
+export async function createInvitation(companyId, { email, role }) {
+  const response = await apiRequest(`/accounts/companies/${companyId}/invitations`, {
+    method: "POST",
+    body: JSON.stringify({ email, role }),
+  });
+  return response?.data;
+}
+
+export async function createAdminCompany({ name, ownerEmail }) {
+  const response = await apiRequest("/accounts/admin/companies", {
+    method: "POST",
+    skipCompanyHeader: true,
+    body: JSON.stringify({ name, ownerEmail }),
+  });
+  return response?.data;
+}
+
+export async function fetchAdminCompanies() {
+  const response = await apiRequest("/accounts/admin/companies", {
+    method: "GET",
+    skipCompanyHeader: true,
+  });
+  return response?.data || [];
+}
+
+export async function assignAdminCompanyOwner(companyId, { ownerEmail }) {
+  const response = await apiRequest(
+    `/accounts/admin/companies/${companyId}/owners`,
+    {
+      method: "POST",
+      skipCompanyHeader: true,
+      body: JSON.stringify({ ownerEmail }),
+    }
+  );
+  return response?.data;
 }

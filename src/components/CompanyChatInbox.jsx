@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { apiBaseUrl, apiRequest } from "../utils/api";
-import { getAccessToken } from "../utils/auth";
+import { useAuth } from "../context/AuthContext";
 
 function toWsBaseUrl(httpBaseUrl) {
   if (httpBaseUrl.startsWith("https://")) {
@@ -30,6 +30,7 @@ function formatDateTime(value) {
 }
 
 export default function CompanyChatInbox() {
+  const { token } = useAuth();
   const [conversations, setConversations] = useState([]);
   const [selectedKey, setSelectedKey] = useState("");
   const [messages, setMessages] = useState([]);
@@ -54,8 +55,6 @@ export default function CompanyChatInbox() {
   }, [messages]);
 
   useEffect(() => {
-    const token = getAccessToken();
-
     if (!token) {
       setStatus("unauthenticated");
       return undefined;
@@ -66,11 +65,7 @@ export default function CompanyChatInbox() {
     async function loadInbox() {
       try {
         setStatus("loading");
-        const response = await apiRequest("/contact-chats/inbox", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const response = await apiRequest("/contact-chats/inbox");
 
         if (!active) {
           return;
@@ -183,8 +178,6 @@ export default function CompanyChatInbox() {
       return;
     }
 
-    const token = getAccessToken();
-
     if (!token) {
       return;
     }
@@ -194,12 +187,7 @@ export default function CompanyChatInbox() {
     async function loadConversationMessages() {
       try {
         const response = await apiRequest(
-          `/contact-chats/messages?serviceId=${selectedConversation.serviceId}&companyId=${selectedConversation.companyId}&conversationUserId=${selectedConversation.conversationUserId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
+          `/contact-chats/messages?serviceId=${selectedConversation.serviceId}&companyId=${selectedConversation.companyId}&conversationUserId=${selectedConversation.conversationUserId}`
         );
 
         if (active) {
